@@ -1,0 +1,15 @@
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Successfully created account for player with username -- 'Admin'
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Successfully created account for player with username -- 'whiteallen7'
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Successfully created account for player with username -- 'billy20'
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:53:02] Response to 93.168.2.22 -- Successfully created account for player with username -- 'petula71'
+[2020/06/18 02:53:02] Response to Starting UDP Server for EU region on port 6790 ... -- Admin
+[2020/06/18 02:54:30] Response to 93.168.2.22 -- Initiating SIGNIN for player
+[2020/06/18 02:54:30] Response to 93.168.2.22 -- Successfully signed in player with username -- 'whiteallen7'
+[2020/06/18 02:54:44] Response to 93.168.2.22 -- Initiating SIGNOUT for player
+[2020/06/18 02:54:44] Response to 93.168.2.22 -- Successfully signed out player with username -- 'whiteallen7'
+[2020/06/18 02:55:37] Response to 93.168.2.22 -- Initiating SIGNIN for player
+[2020/06/18 02:55:37] Response to 93.168.2.22 -- Player with username 'haarbs' does not exist

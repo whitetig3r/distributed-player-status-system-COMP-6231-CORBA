@@ -1,0 +1,15 @@
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Successfully created account for player with username -- 'Admin'
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Successfully created account for player with username -- 'whiteallen7'
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Successfully created account for player with username -- 'billy20'
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Initiating CREATEACCOUNT for player
+[2020/06/18 02:52:47] Response to 132.168.2.22 -- Successfully created account for player with username -- 'petula71'
+[2020/06/18 02:52:47] Response to Starting UDP Server for NA region on port 6789 ... -- Admin
+[2020/06/18 02:53:49] Response to 132.168.2.22 -- Initiating SIGNIN for player
+[2020/06/18 02:53:49] Response to 132.168.2.22 -- Successfully signed in player with username -- 'billy20'
+[2020/06/18 02:54:03] Response to 132.168.2.22 -- Initiating SIGNOUT for player
+[2020/06/18 02:54:03] Response to 132.168.2.22 -- Player 'whiteallen7' is already signed out
+[2020/06/18 02:54:13] Response to 132.168.2.22 -- Initiating SIGNOUT for player
+[2020/06/18 02:54:13] Response to 132.168.2.22 -- Successfully signed out player with username -- 'billy20'
