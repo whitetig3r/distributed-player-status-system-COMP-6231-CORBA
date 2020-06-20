@@ -30,7 +30,8 @@ public class AdministratorsClient extends CoreClient {
 				+ "1. Sign in with admin privileges\n"
 				+ "2. Sign out admin\n"
 				+ "3. Get status of all players playing the game\n"
-				+ "4. Exit the CLI\n"
+				+ "4. Suspend a Player account\n"
+				+ "5. Exit the CLI\n"
 				+ "--------------------------\n";
 		while(true) {
 			System.out.println(MENU_STRING);
@@ -48,6 +49,10 @@ public class AdministratorsClient extends CoreClient {
 					break;
 				}
 				case "4": {
+					adminSuspendAccount();
+					break;
+				}
+				case "5": {
 					System.out.println("Goodbye!");
 					System.exit(0);
 				}
@@ -137,6 +142,35 @@ public class AdministratorsClient extends CoreClient {
 
 	}
 	
+	private static void adminSuspendAccount() {
+		String uName;
+		String uNameToSuspend;
+		String password;
+		String ipAddress;
+		
+		setLoggingContext("UNRESOLVED", "UnresolvedIP", true);
+		uName = getSafeStringInput("Enter User Name:");
+		password = getSafeStringInput("Enter Password:");
+		System.out.println("Enter IP Address:");
+		ipAddress = getIpAddressInput();
+		uNameToSuspend = getSafeStringInput("Enter User Name To Suspend:");
+		
+		try {
+			realizeSuspendAccount(uName, password, ipAddress, uNameToSuspend);
+		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
+			handleServerDown(uName, ipAddress, e);
+		} catch (UnknownServerRegionException e) {
+			String err = "ERROR: Unknown Server for IP address!";
+			System.out.println(err);
+			adminLog(err, uName, "Unknown Server");
+		}
+
+	}
+
 	private static void setRegionORB(String regionString) throws UnknownServerRegionException, InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName {
 		if(regionString.equals("Unknown Server")) throw new UnknownServerRegionException();
 		
@@ -179,6 +213,15 @@ public class AdministratorsClient extends CoreClient {
 		System.out.println(retStatement);
 		adminLog(retStatement, uName, getRegionServer(ipAddress));
 
+	}
+	
+	private static void realizeSuspendAccount(String uName, String password, String ipAddress, String uNameToSuspend) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName, UnknownServerRegionException {
+		String regionString = getRegionServer(ipAddress);
+		setRegionORB(regionString);
+		
+		String retStatement = serverStub.suspendAccount(uName, password, ipAddress, uNameToSuspend);
+		System.out.println(retStatement);
+		adminLog(retStatement, uName, getRegionServer(ipAddress));
 	}
 	
 	private static void handleServerDown(String uName, String ipAddress, Exception e) {

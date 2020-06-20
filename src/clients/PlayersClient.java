@@ -30,7 +30,8 @@ public class PlayersClient extends CoreClient {
 				+ "1. Create a Player account\n"
 				+ "2. Sign a Player in\n"
 				+ "3. Sign a Player out\n"
-				+ "4. Exit the CLI\n"
+				+ "4. Transfer Player account\n"
+				+ "5. Exit the CLI\n"
 				+ "--------------------------\n";
 		try {
 			System.out.println("NOTE -- Player Logs available at " + System.getProperty("user.dir") + "/player_logs/");
@@ -53,6 +54,10 @@ public class PlayersClient extends CoreClient {
 						break;
 					}
 					case "4": {
+						playerTransferAccount();
+						break;
+					}
+					case "5": {
 						System.out.println("Goodbye!");
 						System.exit(0);
 					}
@@ -153,6 +158,47 @@ public class PlayersClient extends CoreClient {
 
 	}
 	
+	private static void playerTransferAccount() {
+		String uName;
+		String password;
+		String oldIpAddress;
+		String newIpAddress;
+		
+		setLoggingContext("UNRESOLVED_PLAYER", "UnresolvedIP");
+		uName = getSafeStringInput("Enter User Name:");
+		password = getSafeStringInput("Enter Password:");
+		System.out.println("Enter old IP Address:");
+		oldIpAddress = getIpAddressInput();
+		System.out.println("Enter new IP Address:");
+		newIpAddress = getIpAddressInput();
+		try {
+			realizePlayerTransferAccount(uName, password, oldIpAddress, newIpAddress);
+		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, oldIpAddress);
+		} catch (org.omg.CORBA.SystemException e) {
+			handleServerDown(uName, oldIpAddress, e);
+		}
+
+	}
+	
+	private static void realizePlayerTransferAccount(String uName, String password, String oldIpAddress,
+			String newIpAddress) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName {
+		String regionString = getRegionServer(oldIpAddress);
+		try {
+			setRegionORB(regionString);
+			
+			String retStatement = serverStub.transferAccount(uName, password, oldIpAddress, newIpAddress);
+			System.out.println(retStatement);
+			playerLog(retStatement, uName, oldIpAddress);
+		} catch(UnknownServerRegionException e) {
+			String log = "The server for which the ORB is to be created is unknown";
+			playerLog(log, uName, oldIpAddress);
+		}
+		
+	}
+
 	private static void realizeCreatePlayerAccount(String fName, String lName, String uName, String password, int age, String ipAddress) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName {
 		String regionString = getRegionServer(ipAddress);
 		try {

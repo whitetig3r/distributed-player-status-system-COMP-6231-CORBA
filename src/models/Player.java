@@ -1,9 +1,13 @@
 package models;
 
+import java.io.Serializable;
+
 import exceptions.BadPasswordException;
 import exceptions.BadUserNameException;
 
-public class Player {
+public class Player implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 	private String fName, lName, uName, password, ipAddress;
 	private boolean status;
 	private int age;

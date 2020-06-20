@@ -1,8 +1,13 @@
 package servers;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -12,11 +17,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,7 +39,7 @@ public class GameServerServant extends GameServerPOA {
 	private int INT_UDP_PORT;
 	private final int SERVER_TIMEOUT_IN_MILLIS = 5000;
 	
-	private HashMap<Character,ArrayList<Player>> playerHash = new HashMap<>();
+	private ConcurrentHashMap<Character,ArrayList<Player>> playerHash = new ConcurrentHashMap<>();
 
 	private String gameServerLocation;
 	private ORB orb;
@@ -296,22 +302,30 @@ public class GameServerServant extends GameServerPOA {
     	  String log = String.format("Starting UDP Server for %s region on port %d ...",gameServerLocation, INT_UDP_PORT);
 		  System.out.println(log);
 		  serverLog("Admin",log);
-		  listenForPlayerStatusRequests();
+		  listenForServerRequests();
 		});
 		
 	}
 	
-	private void listenForPlayerStatusRequests() {
+	private void listenForServerRequests() {
 		// UDP server awaiting requests from other game servers
 		DatagramSocket aSocket = null;
 		try{
 	    	aSocket = new DatagramSocket(INT_UDP_PORT);
-			byte[] buffer = new byte[1000];
- 			while(true){
+			byte[] buffer = new byte[65508];
+ 			while(true) {
  				DatagramPacket request = new DatagramPacket(buffer, buffer.length);
-  				aSocket.receive(request);     
-  				String toSend = this.getPlayerCounts();
-    			DatagramPacket reply = new DatagramPacket(toSend.getBytes(), toSend.getBytes().length, request.getAddress(), request.getPort());
+  				aSocket.receive(request); 
+  				String toSend;
+  				DatagramPacket reply; 
+  				String stringRequest = new String(request.getData());
+  				if(stringRequest.equals("getStatus")) {
+	  				toSend = this.getPlayerCounts();
+  				} else {
+  					Player playerToAdd = deserializePlayer(request.getData());
+  					toSend = addPlayerToServer(playerToAdd);
+  				}
+  				reply = new DatagramPacket(toSend.getBytes(), toSend.getBytes().length, request.getAddress(), request.getPort());
     			aSocket.send(reply);
     		}
 		} catch (SocketException e){
@@ -325,6 +339,23 @@ public class GameServerServant extends GameServerPOA {
 		}
 	}
 	
+	private String addPlayerToServer(Player p) {
+		return createPlayerAccount(p.getfName(), p.getlName(), p.getuName(), p.getPassword(), p.getIpAddress(), p.getAge());
+	}
+
+	private Player deserializePlayer(byte[] player) {
+		ByteArrayInputStream bis = new ByteArrayInputStream(player);
+		ObjectInput in;
+		Player playerToReturn = null;
+		try {
+			in = new ObjectInputStream(bis);
+			playerToReturn = (Player) in.readObject();
+		} catch (IOException | ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return playerToReturn;
+	}
+
 	private String makeUDPRequestToExternalServer(int serverPort) {
 		DatagramSocket aSocket = null;
 		String reqOp = "getStatus";
@@ -351,6 +382,37 @@ public class GameServerServant extends GameServerPOA {
 			return "Socket Exception: " + e.getMessage();
 		} catch (IOException e) {
 			serverLog(e.getMessage(), "Admin");
+			return "IO Exception: " + e.getMessage();
+		} finally {
+			if(aSocket != null) aSocket.close();
+		}
+	}
+	
+	private String makeUDPTransferRequestToExternalServer(int serverPort, byte[] serializedPlayer, String playerUsername) {
+		DatagramSocket aSocket = null;
+		try {
+			aSocket = new DatagramSocket();    
+			aSocket.setSoTimeout(SERVER_TIMEOUT_IN_MILLIS); 
+			byte [] m = serializedPlayer;
+			InetAddress aHost = InetAddress.getByName("127.0.0.1");		                                                 
+			DatagramPacket request =
+			 	new DatagramPacket(m, m.length, aHost, serverPort);
+			aSocket.send(request);			                        
+			byte[] buffer = new byte[1000];
+			DatagramPacket reply = new DatagramPacket(buffer, buffer.length);	
+			aSocket.receive(reply);
+			String succ = new String(reply.getData());	
+			serverLog(succ, playerUsername);
+			return succ;
+		} catch (SocketTimeoutException e) {
+			String timeOut = String.format("Request to server on port %d has timed out!", serverPort);
+			serverLog(timeOut, playerUsername);
+			return timeOut;
+		} catch (SocketException e){
+			serverLog(e.getMessage(), playerUsername);
+			return "Socket Exception: " + e.getMessage();
+		} catch (IOException e) {
+			serverLog(e.getMessage(), playerUsername);
 			return "IO Exception: " + e.getMessage();
 		} finally {
 			if(aSocket != null) aSocket.close();
@@ -418,5 +480,137 @@ public class GameServerServant extends GameServerPOA {
 	
 	public void shutdown() {
 		orb.shutdown(false);
+	}
+
+	@Override
+	public String transferAccount(String uName, String password, String oldIpAddress, String newIpAddress) {
+		serverLog("Initiating TRANSFER ACCOUNT action for player", oldIpAddress);
+		Character uNameFirstChar = uName.charAt(0);
+		
+		if(!this.playerHash.containsKey(uNameFirstChar)) {
+			String errExist = String.format("Player with username '%s' does not exist", uName);
+			serverLog(errExist, oldIpAddress);
+			return errExist;
+		}
+		
+		Player playerToTransfer = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
+			return player.getuName().equals(uName) && player.getPassword().equals(password);
+		}).findAny().orElse(null);
+		
+		ReentrantLock mutex = new ReentrantLock();
+		
+		if(playerToTransfer != null) {
+			try {
+				mutex.lock();
+				int ret = atomicallyExecuteTransfer(playerToTransfer, uNameFirstChar, newIpAddress);
+				if(ret > 0) {
+					this.playerHash.get(uNameFirstChar).remove(playerToTransfer);
+					return String.format("Successfully TRANSFERRED ACCOUNT for player with username %s to %s", uName, newIpAddress); 
+				} else {
+					return "Failed to TRANSFER account";
+				}
+			} finally {
+				mutex.unlock();
+			}
+		}
+		
+		String errExist = String.format("Player with username '%s' and that password combination does not exist", uName);
+		serverLog(errExist, oldIpAddress);
+		return errExist;
+	}
+
+	private int atomicallyExecuteTransfer(Player playerToTransfer, Character firstChar, String newIpAddress) {
+		byte[] serializedPlayer = serializePlayerObject(playerToTransfer);
+		
+		if(serializedPlayer != null) {
+			int portToUse = getRegionUDPServerPort(newIpAddress);
+			if(portToUse > 0) {
+				String retVal = makeUDPTransferRequestToExternalServer(portToUse, serializedPlayer, playerToTransfer.getuName());
+				if(retVal.startsWith("Successfully")){
+					return 1;
+				}
+			} else {
+				return -2;
+			}
+		}
+		return -1;
+	}
+	
+	private int getRegionUDPServerPort(String ipAddress) {
+		if(ipAddress.startsWith("132")) {
+			return getUDPServerPort("NA");
+		} else if (ipAddress.startsWith("93")) {
+			return getUDPServerPort("EU");
+		} else if (ipAddress.startsWith("182")) {
+			return getUDPServerPort("AS");
+		} else return -1;
+	}
+
+	private int getUDPServerPort(String region) {
+		int port = -1;
+		switch(region) {
+			case "NA": {
+				port = EXT_UDP_PORTS.get(0);
+				break;
+			} 
+			case "EU": {
+				if(gameServerLocation.equals("NA")) {
+					port = EXT_UDP_PORTS.get(0);
+				} else {
+					port = EXT_UDP_PORTS.get(1);
+				}
+				break;
+			}
+			case "AS": {
+				if(gameServerLocation.equals("NA")) {
+					port = EXT_UDP_PORTS.get(1);
+				} else {
+					port = EXT_UDP_PORTS.get(1);
+				}
+				break;
+			}
+		}
+		return port;
+	}
+
+	private byte[] serializePlayerObject(Player playerToTransfer) {
+		byte[] serializedPlayer = null;
+		try {
+			ByteArrayOutputStream tempByteOutputStream = new ByteArrayOutputStream();
+			ObjectOutputStream tempObjectOutputStream = new ObjectOutputStream(tempByteOutputStream);
+			tempObjectOutputStream.writeObject(playerToTransfer);
+			serializedPlayer = tempByteOutputStream.toByteArray();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return serializedPlayer;
+	}
+
+	@Override
+	public String suspendAccount(String uName, String password, String ipAddress, String uNameToSuspend) {
+		serverLog("Initiating PLAYER ACCOUNT SUSPEND action for admin", ipAddress);
+		Character uNameFirstChar = uNameToSuspend.charAt(0);
+		
+		if(uName.equals("Admin") && password.equals("Admin")) {
+			Player playerToSuspend = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
+				return player.getuName().equals(uNameToSuspend);
+			}).findAny().orElse(null);
+			
+			if(playerToSuspend != null) {
+				Character firstCharOfPlayer = playerToSuspend.getuName().charAt(0);
+				this.playerHash.get(firstCharOfPlayer).remove(playerToSuspend);
+				String success = String.format("Successfully suspended account for player with username -- %s", uNameToSuspend);
+				serverLog(success, ipAddress);
+				return success;
+			} else {
+				String noSuchPlayer = String.format("Failed to find player account with username -- %s", uNameToSuspend);
+				serverLog(noSuchPlayer, ipAddress);
+				return noSuchPlayer;
+			}
+		}
+		
+		String errExist = "Admin with that password combination does not exist";
+		serverLog(errExist, ipAddress);
+		return errExist;
 	}
 }
