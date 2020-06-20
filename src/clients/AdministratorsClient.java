@@ -1,23 +1,29 @@
 package clients;
 
-import java.net.MalformedURLException;
-import java.rmi.ConnectException;
-import java.rmi.Naming;
-import java.rmi.NotBoundException;
-import java.rmi.RemoteException;
 import java.util.Scanner;
 
+import org.omg.CORBA.ORB;
+import org.omg.CORBA.ORBPackage.InvalidName;
+import org.omg.CosNaming.NameComponent;
+import org.omg.CosNaming.NamingContext;
+import org.omg.CosNaming.NamingContextHelper;
+import org.omg.CosNaming.NamingContextPackage.CannotProceed;
+import org.omg.CosNaming.NamingContextPackage.NotFound;
+
+import CoreGameServerIDL.GameServer;
+import CoreGameServerIDL.GameServerHelper;
 import exceptions.UnknownServerRegionException;
-import servers.GameServerRMI;
 
 public class AdministratorsClient extends CoreClient {
 	
 	private static Scanner sc = new Scanner(System.in);
-	private static GameServerRMI serverStub;
-	private static String serverToConnect;
+	private static GameServer serverStub; 
+	private static String[] CLIENT_ORB_ARGS;
 	
 
 	public static void main(String[] args) {
+		final String[] defaultORBArgs = { "-ORBInitialPort", "1050" };
+		CLIENT_ORB_ARGS = args.length == 0 ? defaultORBArgs : args;
 		System.out.println("NOTE -- Admin Logs available at " + System.getProperty("user.dir") + "/admin_logs");
 		final String MENU_STRING = "\n-- Admin Client CLI --\n"
 				+ "Pick an option ...\n"
@@ -65,8 +71,16 @@ public class AdministratorsClient extends CoreClient {
 		
 		try {
 			realizeAdminSignIn(uName, password, ipAddress);
-		} catch (MalformedURLException | RemoteException | NotBoundException e) {
+		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
+		} catch (UnknownServerRegionException e) {
+			String err = "ERROR: Unknown Server for IP address!";
+			System.out.println(err);
+			adminLog(err, uName, "Unknown Server");
 		}
 
 	}
@@ -82,8 +96,16 @@ public class AdministratorsClient extends CoreClient {
 		
 		try {
 			realizeAdminSignOut(uName, ipAddress);
-		} catch (MalformedURLException | RemoteException | NotBoundException e) {
+		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
+		} catch (UnknownServerRegionException e) {
+			String err = "ERROR: Unknown Server for IP address!";
+			System.out.println(err);
+			adminLog(err, uName, "Unknown Server");
 		}
 
 	}
@@ -101,49 +123,67 @@ public class AdministratorsClient extends CoreClient {
 		
 		try {
 			realizeAdminGetPlayerStatus(uName, password, ipAddress);
-		} catch (MalformedURLException | RemoteException | NotBoundException | UnknownServerRegionException e) {
+		}  catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			adminLog(err, uName, getRegionServer(ipAddress));
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
+		} catch (UnknownServerRegionException e) {
+			String err = "ERROR: Unknown Server for IP address!";
+			System.out.println(err);
+			adminLog(err, uName, "Unknown Server");
 		}
 
 	}
-
-	private static void realizeAdminSignIn(String uName, String password, String ipAddress) throws RemoteException, MalformedURLException, NotBoundException {
-		int registryPort = getRegionServer(ipAddress);
-		serverToConnect = getServerName(registryPort);
+	
+	private static void setRegionORB(String regionString) throws UnknownServerRegionException, InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName {
+		if(regionString.equals("Unknown Server")) throw new UnknownServerRegionException();
 		
-		serverStub = (GameServerRMI) Naming.lookup(String.format("rmi://127.0.0.1:%d/GameServer",registryPort));
+	    // create and initialize the ORB
+	    ORB orb = ORB.init(CLIENT_ORB_ARGS, null);
+ 
+        // get the root naming context
+        org.omg.CORBA.Object objRef = orb.resolve_initial_references("NameService");
+        NamingContext ncRef = NamingContextHelper.narrow(objRef);
+
+        // resolve the Object Reference in Naming
+        NameComponent nc = new NameComponent(regionString, "");
+        NameComponent path[] = {nc};
+        serverStub = GameServerHelper.narrow(ncRef.resolve(path));
+	}
+
+	private static void realizeAdminSignIn(String uName, String password, String ipAddress) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName, UnknownServerRegionException {
+		String regionString = getRegionServer(ipAddress);
+		setRegionORB(regionString);
+		
 		String retStatement = serverStub.adminSignIn(uName, password, ipAddress);
 		System.out.println(retStatement);
-		adminLog(retStatement, uName, serverToConnect);
+		adminLog(retStatement, uName, getRegionServer(ipAddress));
 	}
 	
-	private static void realizeAdminSignOut(String uName, String ipAddress) throws RemoteException, MalformedURLException, NotBoundException {
-		int registryPort = getRegionServer(ipAddress);
-		serverToConnect = getServerName(registryPort);
+	private static void realizeAdminSignOut(String uName, String ipAddress) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName, UnknownServerRegionException{
+		String regionString = getRegionServer(ipAddress);
+		setRegionORB(regionString);
 		
-		serverStub = (GameServerRMI) Naming.lookup(String.format("rmi://127.0.0.1:%d/GameServer",registryPort));
 		String retStatement = serverStub.adminSignOut(uName, ipAddress);
 		System.out.println(retStatement);
-		adminLog(retStatement, uName, serverToConnect);
+		adminLog(retStatement, uName, getRegionServer(ipAddress));
 	}
 	
-	private static void realizeAdminGetPlayerStatus(String uName, String password, String ipAddress) throws MalformedURLException, RemoteException, NotBoundException, UnknownServerRegionException{
-		int registryPort = getRegionServer(ipAddress);
-		serverToConnect = getServerName(registryPort);
-
-		serverStub = (GameServerRMI) Naming.lookup(String.format("rmi://127.0.0.1:%d/GameServer",registryPort));
+	private static void realizeAdminGetPlayerStatus(String uName, String password, String ipAddress) throws InvalidName, NotFound, CannotProceed, org.omg.CosNaming.NamingContextPackage.InvalidName, UnknownServerRegionException {
+		String regionString = getRegionServer(ipAddress);
+		setRegionORB(regionString);
+		
 		String retStatement = serverStub.getPlayerStatus(uName, password, ipAddress);
 		System.out.println(retStatement);
-		adminLog(retStatement, uName, serverToConnect);
+		adminLog(retStatement, uName, getRegionServer(ipAddress));
 
 	}
 	
 	private static void handleServerDown(String uName, String ipAddress, Exception e) {
-		String err = e.getMessage();
-		if(e instanceof ConnectException) {
-			err = "ERROR: Region server is not active";
-			System.out.println(err);
-		}
+		String err = "ERROR: Region server is not active";
+		System.out.println(err);
 		adminLog(err, uName, ipAddress);
 	}
 	

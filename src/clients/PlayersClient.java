@@ -80,7 +80,6 @@ public class PlayersClient extends CoreClient {
         NameComponent nc = new NameComponent(regionString, "");
         NameComponent path[] = {nc};
         serverStub = GameServerHelper.narrow(ncRef.resolve(path));
-	
 	}
 
 	private static void createPlayerAccount() {
@@ -104,8 +103,12 @@ public class PlayersClient extends CoreClient {
 		try {
 			realizeCreatePlayerAccount(fName, lName, uName, password, age, ipAddress);
 		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
-		} 
+		}
 	}
 		
 	private static void playerSignIn() {
@@ -121,6 +124,10 @@ public class PlayersClient extends CoreClient {
 		try {
 			realizePlayerSignIn(uName, password, ipAddress);
 		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
 		}
 
@@ -136,8 +143,11 @@ public class PlayersClient extends CoreClient {
 		ipAddress = getIpAddressInput();
 		try {
 			realizePlayerSignOut(uName, ipAddress);
-		}
-		catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {
+			String err = "ERROR: CORBA services encountered an error";
+			System.out.println(err);
+			playerLog(err, uName, ipAddress);
+		} catch (org.omg.CORBA.SystemException e) {
 			handleServerDown(uName, ipAddress, e);
 		}
 
@@ -188,11 +198,8 @@ public class PlayersClient extends CoreClient {
 	}
 	
 	private static void handleServerDown(String uName, String ipAddress, Exception e) {
-		String err = e.getMessage();
-		if(e instanceof NotFound || e instanceof InvalidName || e instanceof CannotProceed || e instanceof org.omg.CosNaming.NamingContextPackage.InvalidName ) {
-			err = "ERROR: Region server is not active";
-			System.out.println(err);
-		}
+		String err = "ERROR: Region server is not active";
+		System.out.println(err);
 		playerLog(err, uName, ipAddress);
 	}
 

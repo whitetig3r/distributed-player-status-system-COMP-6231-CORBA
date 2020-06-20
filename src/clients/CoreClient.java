@@ -57,8 +57,9 @@ public class CoreClient {
 	protected static String getIpAddressInput() {
 		
 		String ipAddress = sc.nextLine();
-		while (CoreClient.getRegionServer(ipAddress) == null || !CoreClient.getRegionServer(ipAddress).startsWith("GameServer")) {
-			if(CoreClient.getRegionServer(ipAddress).equals("Unknown Server")) {
+		String regionServer;
+		while ((regionServer = CoreClient.getRegionServer(ipAddress)) == null || !regionServer.startsWith("GameServer")) {
+			if(regionServer != null && regionServer.equals("Unknown Server")) {
 				String err = "ERROR: Server for this region does not exist!";
 				System.out.println(err);
 				if(isAdmin) adminLog(err,uName,serverToConnect);
@@ -121,8 +122,9 @@ public class CoreClient {
 		 LocalDateTime tStamp = LocalDateTime.now(); 
 		 String writeString = String.format("[%s] %s @ (%s) -- %s", dtf.format(tStamp), uName, ipAddress, logStatement);
 		 String serverRegion = getRegionServer(ipAddress);
+		 String fName = serverRegion.equals("Unknown Server") ? "UNRESOLVED-Players" : serverRegion.substring(10);
 		 try{
-			File file = new File(String.format("player_logs/%s/%s.log", serverRegion.substring(10), uName));
+			File file = new File(String.format("player_logs/%s/%s.log", fName, uName));
 			file.getParentFile().mkdirs();
 			FileWriter fw = new FileWriter(file, true);
 			BufferedWriter logger = new BufferedWriter(fw);
