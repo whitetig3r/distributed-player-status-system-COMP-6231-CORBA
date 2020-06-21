@@ -13,6 +13,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -20,9 +21,12 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,6 +35,8 @@ import org.omg.CORBA.ORB;
 import CoreGameServerIDL.GameServerPOA;
 import exceptions.BadPasswordException;
 import exceptions.BadUserNameException;
+import exceptions.PlayerRemoveException;
+import exceptions.TransferAccountException;
 import exceptions.UnknownServerRegionException;
 import models.Player;
 
@@ -39,7 +45,7 @@ public class GameServerServant extends GameServerPOA {
 	private int INT_UDP_PORT;
 	private final int SERVER_TIMEOUT_IN_MILLIS = 5000;
 	
-	private ConcurrentHashMap<Character,ArrayList<Player>> playerHash = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<Character, CopyOnWriteArrayList<Player>> playerHash = new ConcurrentHashMap<>();
 
 	private String gameServerLocation;
 	private ORB orb;
@@ -62,14 +68,15 @@ public class GameServerServant extends GameServerPOA {
 		createPlayerAccount("Crystal","Reigo","petula71","password", getRegionDefaultIP(), 35);
 	}
 
-	public synchronized String createPlayerAccount(String fName, String lName, String uName, String password, String ipAddress, int age) {
+	@Override
+	public String createPlayerAccount(String fName, String lName, String uName, String password, String ipAddress, int age) {
 		serverLog("Initiating CREATEACCOUNT for player", ipAddress);
 		
 		Character uNameFirstChar = uName.charAt(0);
 		String retString = "An Error was encountered!";
 		
 		if(!this.playerHash.containsKey(uNameFirstChar)) {
-			this.playerHash.put(uNameFirstChar, new ArrayList<Player>());
+			this.playerHash.putIfAbsent(uNameFirstChar, new CopyOnWriteArrayList<Player>());
 		}
 		
 		try {
@@ -81,7 +88,7 @@ public class GameServerServant extends GameServerPOA {
 			if(playerExists.isPresent()) {
 				retString = "Player with that username already exists!";
 			} else {
-				this.playerHash.get(uNameFirstChar).add(playerToAdd);
+				this.playerHash.get(uNameFirstChar).addIfAbsent(playerToAdd);
 				retString = String.format("Successfully created account for player with username -- '%s'", uName);
 			}
 			
@@ -93,7 +100,8 @@ public class GameServerServant extends GameServerPOA {
 		return retString; 
 	}
 	
-	public synchronized String playerSignIn(String uName, String password, String ipAddress) {
+	@Override
+	public String playerSignIn(String uName, String password, String ipAddress) {
 		serverLog("Initiating SIGNIN for player", ipAddress);
 		Character uNameFirstChar = uName.charAt(0);
 		
@@ -113,7 +121,9 @@ public class GameServerServant extends GameServerPOA {
 				serverLog(errSignedIn, ipAddress);
 				return errSignedIn;
 			} else {
-				playerToSignIn.get().setStatus(true);
+				synchronized(playerToSignIn) {
+					playerToSignIn.get().setStatus(true);
+				}
 			}
 			String success = String.format("Successfully signed in player with username -- '%s'",uName);
 			serverLog(success, ipAddress);
@@ -124,7 +134,8 @@ public class GameServerServant extends GameServerPOA {
 		return errExist;
 	}
 	
-	public synchronized String playerSignOut(String uName, String ipAddress) {
+	@Override
+	public String playerSignOut(String uName, String ipAddress) {
 		serverLog("Initiating SIGNOUT for player", ipAddress);
 		Character uNameFirstChar = uName.charAt(0);
 		
@@ -144,7 +155,9 @@ public class GameServerServant extends GameServerPOA {
 				serverLog(errSignedOut, ipAddress);
 				return errSignedOut;
 			} else {
-				playerToSignOut.get().setStatus(false);
+				synchronized(playerToSignOut) {
+					playerToSignOut.get().setStatus(false);
+				}
 			}
 			String success = String.format("Successfully signed out player with username -- '%s'",uName);
 			serverLog(success, ipAddress);
@@ -160,7 +173,8 @@ public class GameServerServant extends GameServerPOA {
 	
 	// CORE ADMIN FUNCTIONALITY
 	
-	public synchronized String adminSignIn(String uName, String password, String ipAddress) {
+	@Override
+	public String adminSignIn(String uName, String password, String ipAddress) {
 		serverLog("Initiating SIGNIN for admin", ipAddress);
 		Character uNameFirstChar = uName.charAt(0);
 		
@@ -175,7 +189,9 @@ public class GameServerServant extends GameServerPOA {
 					serverLog(errSignedIn, ipAddress);
 					return errSignedIn;
 				} else {
-					playerToSignIn.get().setStatus(true);
+					synchronized(playerToSignIn) {
+						playerToSignIn.get().setStatus(true);
+					}
 				}
 				String success = "Successfully signed in admin!";
 				serverLog(success, ipAddress);
@@ -188,7 +204,8 @@ public class GameServerServant extends GameServerPOA {
 		return errExist;
 	}
 	
-	public synchronized String adminSignOut(String uName, String ipAddress) {
+	@Override
+	public String adminSignOut(String uName, String ipAddress) {
 		serverLog("Initiating SIGNOUT for admin", ipAddress);
 		Character uNameFirstChar = uName.charAt(0);
 		
@@ -203,7 +220,9 @@ public class GameServerServant extends GameServerPOA {
 					serverLog(errSignedOut, ipAddress);
 					return errSignedOut;
 				} else {
-					playerToSignOut.get().setStatus(false);
+					synchronized(playerToSignOut) {
+						playerToSignOut.get().setStatus(false);
+					}
 				}
 				String success = "Successfully signed out admin";
 				serverLog(success, ipAddress);
@@ -216,6 +235,7 @@ public class GameServerServant extends GameServerPOA {
 		return errExist;
 	}
 	
+	@Override
 	public String getPlayerStatus(String uName, String password, String ipAddress) {
 		String retStatement = "Unrecognized Error while requesting player status!";
 		
@@ -237,6 +257,91 @@ public class GameServerServant extends GameServerPOA {
 		
 		serverLog(retStatement, ipAddress);
 		return retStatement;
+	}
+	
+	@Override
+	public String transferAccount(String uName, String password, String oldIpAddress, String newIpAddress) {
+		serverLog("Initiating TRANSFER ACCOUNT action for player", oldIpAddress);
+		Character uNameFirstChar = uName.charAt(0);
+		
+		if(!this.playerHash.containsKey(uNameFirstChar)) {
+			String errExist = String.format("Player with username '%s' does not exist", uName);
+			serverLog(errExist, oldIpAddress);
+			return errExist;
+		}
+		
+		Player playerToTransfer = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
+			return player.getuName().equals(uName) && player.getPassword().equals(password);
+		}).findAny().orElse(null);
+		
+		
+		if(playerToTransfer != null) {
+			try {
+				synchronized(playerToTransfer) {
+					playerToTransfer.setIpAddress(newIpAddress);
+					playerToTransfer.setStatus(false);
+				}
+				try {
+					threadSafeRemovePlayer(playerToTransfer, uNameFirstChar);
+				} catch(PlayerRemoveException e) {
+					String err = String.format("Failed to delete player with username -- %s because account does not exist. Aborting TRANSFER!", uName);
+					threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
+					serverLog(err, oldIpAddress);
+					return err;
+				}
+				int ret = atomicallyExecuteTransfer(playerToTransfer, uNameFirstChar, newIpAddress);
+				if(ret > 0) {
+					String log = String.format("Successfully TRANSFERRED ACCOUNT for player with username %s to %s", uName, newIpAddress);
+					serverLog(log, uName);
+					return log;
+				} else {
+					throw new TransferAccountException();
+				}
+			} catch(TransferAccountException e) {
+				String err = String.format("Failed to add player account with username %s on remote server. ROLLING BACK!", uName);
+				threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
+				serverLog(err, oldIpAddress);
+				return err;
+			}
+		}
+		
+		String errExist = String.format("Player with username '%s' and that password combination does not exist", uName);
+		serverLog(errExist, oldIpAddress);
+		return errExist;
+	}
+
+	@Override
+	public String suspendAccount(String uName, String password, String ipAddress, String uNameToSuspend) {
+		serverLog("Initiating PLAYER ACCOUNT SUSPEND action for admin", ipAddress);
+		Character uNameFirstChar = uNameToSuspend.charAt(0);
+		
+		if(uName.equals("Admin") && password.equals("Admin")) {
+			Player playerToSuspend = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
+				return player.getuName().equals(uNameToSuspend);
+			}).findAny().orElse(null);
+			
+			if(playerToSuspend != null) {
+				Character firstCharOfPlayer = playerToSuspend.getuName().charAt(0);
+				try {
+					threadSafeRemovePlayer(playerToSuspend, firstCharOfPlayer);
+				} catch(PlayerRemoveException e) {
+					String err = String.format("Failed to delete player account with username %s..", uNameToSuspend);
+					serverLog(err, "Admin");
+					return err;
+				}
+				String success = String.format("Successfully suspended account for player with username -- %s", uNameToSuspend);
+				serverLog(success, ipAddress);
+				return success;
+			} else {
+				String noSuchPlayer = String.format("Failed to find player account with username -- %s", uNameToSuspend);
+				serverLog(noSuchPlayer, ipAddress);
+				return noSuchPlayer;
+			}
+		}
+		
+		String errExist = "Admin with that password combination does not exist";
+		serverLog(errExist, ipAddress);
+		return errExist;
 	}
 	
 	// END OF CORE ADMIN FUNCTIONALITY
@@ -293,6 +398,40 @@ public class GameServerServant extends GameServerPOA {
 		return succ;
 	}
 	
+	private int atomicallyExecuteTransfer(Player playerToTransfer, Character firstChar, String newIpAddress) throws TransferAccountException {
+		byte[] serializedPlayer = serializePlayerObject(playerToTransfer);
+		
+		if(serializedPlayer != null) {
+			int portToUse = getRegionUDPServerPort(newIpAddress);
+			if(portToUse > 0) {
+				String retVal = makeUDPTransferRequestToExternalServer(portToUse, serializedPlayer, playerToTransfer.getuName());
+				if(retVal.startsWith("Successfully")){
+					return 1;
+				}
+			} else {
+				return -1;
+			}
+		}
+		return -1;
+	}
+	
+	private String addPlayerToServer(Player p) {
+		return createPlayerAccount(p.getfName(), p.getlName(), p.getuName(), p.getPassword(), p.getIpAddress(), p.getAge());
+	}
+	
+	private void threadSafeRemovePlayer(Player playerToSuspend, Character firstCharOfPlayer) throws PlayerRemoveException {
+		if(this.playerHash.get(firstCharOfPlayer).contains(playerToSuspend)) {
+			this.playerHash.get(firstCharOfPlayer).remove(playerToSuspend);
+		} else {
+			throw new PlayerRemoveException();
+		}
+	}
+	
+	private void threadSafeAddPlayerBack(Player playerToTransfer, Character uNameFirstChar) {
+		// not calling createPlayer to avoid logging
+		this.playerHash.get(uNameFirstChar).addIfAbsent(playerToTransfer);
+	}
+	
 	// NETWORK UTILS 
 	
 	private void runRegionUdpServer() {
@@ -310,6 +449,7 @@ public class GameServerServant extends GameServerPOA {
 	private void listenForServerRequests() {
 		// UDP server awaiting requests from other game servers
 		DatagramSocket aSocket = null;
+		String loggingEntity = "Admin";
 		try{
 	    	aSocket = new DatagramSocket(INT_UDP_PORT);
 			byte[] buffer = new byte[65508];
@@ -318,32 +458,49 @@ public class GameServerServant extends GameServerPOA {
   				aSocket.receive(request); 
   				String toSend;
   				DatagramPacket reply; 
-  				String stringRequest = new String(request.getData());
+  				String stringRequest = new String(request.getData(), 0, 9, StandardCharsets.UTF_8);
+  				// get status request
   				if(stringRequest.equals("getStatus")) {
 	  				toSend = this.getPlayerCounts();
-  				} else {
+	  				loggingEntity = "Admin";
+  				} 
+  				// transfer player request
+  				else {
   					Player playerToAdd = deserializePlayer(request.getData());
   					toSend = addPlayerToServer(playerToAdd);
+  					loggingEntity = playerToAdd.getuName();
   				}
   				reply = new DatagramPacket(toSend.getBytes(), toSend.getBytes().length, request.getAddress(), request.getPort());
     			aSocket.send(reply);
     		}
 		} catch (SocketException e){
 			System.out.println("Socket Exception: " + e.getMessage());
-			serverLog(e.getMessage(), "Admin");
+			serverLog(e.getMessage(), loggingEntity);
 		} catch (IOException e) {
 			System.out.println("IO Exception: " + e.getMessage());
-			serverLog(e.getMessage(), "Admin");
+			serverLog(e.getMessage(), loggingEntity);
+		} catch (TransferAccountException e) {
+			System.out.println("Transfer Account Exception: " + e.getMessage());
+			serverLog(e.getMessage(), loggingEntity);
 		} finally {
 			if(aSocket != null) aSocket.close();
 		}
 	}
 	
-	private String addPlayerToServer(Player p) {
-		return createPlayerAccount(p.getfName(), p.getlName(), p.getuName(), p.getPassword(), p.getIpAddress(), p.getAge());
+	private byte[] serializePlayerObject(Player playerToTransfer) throws TransferAccountException {
+		byte[] serializedPlayer = null;
+		try {
+			ByteArrayOutputStream tempByteOutputStream = new ByteArrayOutputStream();
+			ObjectOutputStream tempObjectOutputStream = new ObjectOutputStream(tempByteOutputStream);
+			tempObjectOutputStream.writeObject(playerToTransfer);
+			serializedPlayer = tempByteOutputStream.toByteArray();
+		} catch (IOException e) {
+			throw new TransferAccountException();
+		}
+		return serializedPlayer;
 	}
 
-	private Player deserializePlayer(byte[] player) {
+	private Player deserializePlayer(byte[] player) throws TransferAccountException {
 		ByteArrayInputStream bis = new ByteArrayInputStream(player);
 		ObjectInput in;
 		Player playerToReturn = null;
@@ -351,7 +508,7 @@ public class GameServerServant extends GameServerPOA {
 			in = new ObjectInputStream(bis);
 			playerToReturn = (Player) in.readObject();
 		} catch (IOException | ClassNotFoundException e) {
-			e.printStackTrace();
+			throw new TransferAccountException();
 		}
 		return playerToReturn;
 	}
@@ -455,86 +612,6 @@ public class GameServerServant extends GameServerPOA {
 				throw new UnknownServerRegionException();
 		}
 	}
-
-	private synchronized void serverLog(String logStatement, String ipAddress) {
-		 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");  
-		 LocalDateTime tStamp = LocalDateTime.now(); 
-		 String writeString = String.format("[%s] Response to %s -- %s", dtf.format(tStamp), ipAddress, logStatement);
-		 try{
-			File file = new File(String.format("server_logs/%s-server.log", this.gameServerLocation));
-			file.getParentFile().mkdirs();
-			FileWriter fw = new FileWriter(file, true);
-			BufferedWriter logger = new BufferedWriter(fw);
-			logger.write(writeString);
-			logger.newLine();
-			logger.close();
-		} catch (IOException e) {
-			// can't really log an error while logging
-			e.printStackTrace();
-		}
-	}
-
-	public void setORB(ORB orb) {
-		this.orb = orb; 
-	}
-	
-	public void shutdown() {
-		orb.shutdown(false);
-	}
-
-	@Override
-	public String transferAccount(String uName, String password, String oldIpAddress, String newIpAddress) {
-		serverLog("Initiating TRANSFER ACCOUNT action for player", oldIpAddress);
-		Character uNameFirstChar = uName.charAt(0);
-		
-		if(!this.playerHash.containsKey(uNameFirstChar)) {
-			String errExist = String.format("Player with username '%s' does not exist", uName);
-			serverLog(errExist, oldIpAddress);
-			return errExist;
-		}
-		
-		Player playerToTransfer = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
-			return player.getuName().equals(uName) && player.getPassword().equals(password);
-		}).findAny().orElse(null);
-		
-		ReentrantLock mutex = new ReentrantLock();
-		
-		if(playerToTransfer != null) {
-			try {
-				mutex.lock();
-				int ret = atomicallyExecuteTransfer(playerToTransfer, uNameFirstChar, newIpAddress);
-				if(ret > 0) {
-					this.playerHash.get(uNameFirstChar).remove(playerToTransfer);
-					return String.format("Successfully TRANSFERRED ACCOUNT for player with username %s to %s", uName, newIpAddress); 
-				} else {
-					return "Failed to TRANSFER account";
-				}
-			} finally {
-				mutex.unlock();
-			}
-		}
-		
-		String errExist = String.format("Player with username '%s' and that password combination does not exist", uName);
-		serverLog(errExist, oldIpAddress);
-		return errExist;
-	}
-
-	private int atomicallyExecuteTransfer(Player playerToTransfer, Character firstChar, String newIpAddress) {
-		byte[] serializedPlayer = serializePlayerObject(playerToTransfer);
-		
-		if(serializedPlayer != null) {
-			int portToUse = getRegionUDPServerPort(newIpAddress);
-			if(portToUse > 0) {
-				String retVal = makeUDPTransferRequestToExternalServer(portToUse, serializedPlayer, playerToTransfer.getuName());
-				if(retVal.startsWith("Successfully")){
-					return 1;
-				}
-			} else {
-				return -2;
-			}
-		}
-		return -1;
-	}
 	
 	private int getRegionUDPServerPort(String ipAddress) {
 		if(ipAddress.startsWith("132")) {
@@ -573,44 +650,40 @@ public class GameServerServant extends GameServerPOA {
 		return port;
 	}
 
-	private byte[] serializePlayerObject(Player playerToTransfer) {
-		byte[] serializedPlayer = null;
-		try {
-			ByteArrayOutputStream tempByteOutputStream = new ByteArrayOutputStream();
-			ObjectOutputStream tempObjectOutputStream = new ObjectOutputStream(tempByteOutputStream);
-			tempObjectOutputStream.writeObject(playerToTransfer);
-			serializedPlayer = tempByteOutputStream.toByteArray();
+	private void serverLog(String logStatement, String ipAddress) {
+		 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");  
+		 LocalDateTime tStamp = LocalDateTime.now(); 
+		 String writeString = String.format("[%s] Response to %s -- %s", dtf.format(tStamp), ipAddress, logStatement);
+		 try{
+			 ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+			 Lock writeLock = readWriteLock.writeLock();
+			 
+			 writeLock.lock();
+			 
+			 File file = new File(String.format("server_logs/%s-server.log", this.gameServerLocation));
+			 file.getParentFile().mkdirs();
+			 FileWriter fw = new FileWriter(file, true);
+			 BufferedWriter logger = new BufferedWriter(fw);
+			 logger.write(writeString);
+			 logger.newLine();
+			 logger.close();
+			 
+			 writeLock.unlock();
+			 
 		} catch (IOException e) {
+			// can't really log an error while logging
 			e.printStackTrace();
 		}
-		return serializedPlayer;
 	}
 
-	@Override
-	public String suspendAccount(String uName, String password, String ipAddress, String uNameToSuspend) {
-		serverLog("Initiating PLAYER ACCOUNT SUSPEND action for admin", ipAddress);
-		Character uNameFirstChar = uNameToSuspend.charAt(0);
-		
-		if(uName.equals("Admin") && password.equals("Admin")) {
-			Player playerToSuspend = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
-				return player.getuName().equals(uNameToSuspend);
-			}).findAny().orElse(null);
-			
-			if(playerToSuspend != null) {
-				Character firstCharOfPlayer = playerToSuspend.getuName().charAt(0);
-				this.playerHash.get(firstCharOfPlayer).remove(playerToSuspend);
-				String success = String.format("Successfully suspended account for player with username -- %s", uNameToSuspend);
-				serverLog(success, ipAddress);
-				return success;
-			} else {
-				String noSuchPlayer = String.format("Failed to find player account with username -- %s", uNameToSuspend);
-				serverLog(noSuchPlayer, ipAddress);
-				return noSuchPlayer;
-			}
-		}
-		
-		String errExist = "Admin with that password combination does not exist";
-		serverLog(errExist, ipAddress);
-		return errExist;
+	// CORBA UTILS 
+	
+	public void setORB(ORB orb) {
+		this.orb = orb; 
 	}
+	
+	public void shutdown() {
+		orb.shutdown(false);
+	}
+	
 }

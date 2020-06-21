@@ -162,7 +162,7 @@ public class PlayersClient extends CoreClient {
 		String uName;
 		String password;
 		String oldIpAddress;
-		String newIpAddress;
+		String newIpAddress = "";
 		
 		setLoggingContext("UNRESOLVED_PLAYER", "UnresolvedIP");
 		uName = getSafeStringInput("Enter User Name:");
@@ -170,7 +170,11 @@ public class PlayersClient extends CoreClient {
 		System.out.println("Enter old IP Address:");
 		oldIpAddress = getIpAddressInput();
 		System.out.println("Enter new IP Address:");
-		newIpAddress = getIpAddressInput();
+		do {
+			System.out.println("NOTE: Ensure that the region of the IP Address to Transfer is different from your current region!");
+			newIpAddress = getIpAddressInput();
+		} while(newIpAddress.startsWith(oldIpAddress.substring(0,3)));
+		
 		try {
 			realizePlayerTransferAccount(uName, password, oldIpAddress, newIpAddress);
 		} catch(InvalidName | NotFound | CannotProceed | org.omg.CosNaming.NamingContextPackage.InvalidName e) {

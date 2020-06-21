@@ -141,7 +141,7 @@ public class CoreClient {
 		 if(!REGION_LIST.contains(serverToConnect)) serverToConnect = "GameServerUNRESOLVED";
 		 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");  
 		 LocalDateTime tStamp = LocalDateTime.now(); 
-		 String writeString = String.format("[%s] %s @ (Admin-%s) -- %s", dtf.format(tStamp), uName, serverToConnect.substring(8), logStatement);
+		 String writeString = String.format("[%s] %s @ (Admin-%s) -- %s", dtf.format(tStamp), uName, serverToConnect.substring(10), logStatement);
 		 try{
 			File file = new File(String.format("admin_logs/%s-admin.log", serverToConnect.substring(10)));
 			file.getParentFile().mkdirs();
