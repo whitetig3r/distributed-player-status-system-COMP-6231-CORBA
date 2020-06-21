@@ -169,6 +169,57 @@ public class GameServerServant extends GameServerPOA {
 		return errExist;
 	}
 	
+	@Override
+	public String transferAccount(String uName, String password, String oldIpAddress, String newIpAddress) {
+		serverLog("Initiating TRANSFER ACCOUNT action for player", oldIpAddress);
+		Character uNameFirstChar = uName.charAt(0);
+		
+		if(!this.playerHash.containsKey(uNameFirstChar)) {
+			String errExist = String.format("Player with username '%s' does not exist", uName);
+			serverLog(errExist, oldIpAddress);
+			return errExist;
+		}
+		
+		Player playerToTransfer = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
+			return player.getuName().equals(uName) && player.getPassword().equals(password);
+		}).findAny().orElse(null);
+		
+		
+		if(playerToTransfer != null) {
+			try {
+				synchronized(playerToTransfer) {
+					playerToTransfer.setIpAddress(newIpAddress);
+					playerToTransfer.setStatus(false);
+				}
+				try {
+					threadSafeRemovePlayer(playerToTransfer, uNameFirstChar);
+				} catch(PlayerRemoveException e) {
+					String err = String.format("Failed to delete player with username -- %s because account does not exist. Aborting TRANSFER!", uName);
+					threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
+					serverLog(err, oldIpAddress);
+					return err;
+				}
+				int ret = atomicallyExecuteTransfer(playerToTransfer, uNameFirstChar, newIpAddress);
+				if(ret > 0) {
+					String log = String.format("Successfully TRANSFERRED ACCOUNT for player with username %s to %s", uName, newIpAddress);
+					serverLog(log, uName);
+					return log;
+				} else {
+					throw new TransferAccountException();
+				}
+			} catch(TransferAccountException e) {
+				String err = String.format("Failed to add player account with username %s on remote server. ROLLING BACK!", uName);
+				threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
+				serverLog(err, oldIpAddress);
+				return err;
+			}
+		}
+		
+		String errExist = String.format("Player with username '%s' and that password combination does not exist", uName);
+		serverLog(errExist, oldIpAddress);
+		return errExist;
+	}
+	
 	// END OF CORE PLAYER FUNCTIONALITY
 	
 	// CORE ADMIN FUNCTIONALITY
@@ -257,57 +308,6 @@ public class GameServerServant extends GameServerPOA {
 		
 		serverLog(retStatement, ipAddress);
 		return retStatement;
-	}
-	
-	@Override
-	public String transferAccount(String uName, String password, String oldIpAddress, String newIpAddress) {
-		serverLog("Initiating TRANSFER ACCOUNT action for player", oldIpAddress);
-		Character uNameFirstChar = uName.charAt(0);
-		
-		if(!this.playerHash.containsKey(uNameFirstChar)) {
-			String errExist = String.format("Player with username '%s' does not exist", uName);
-			serverLog(errExist, oldIpAddress);
-			return errExist;
-		}
-		
-		Player playerToTransfer = this.playerHash.get(uNameFirstChar).stream().filter(player -> {
-			return player.getuName().equals(uName) && player.getPassword().equals(password);
-		}).findAny().orElse(null);
-		
-		
-		if(playerToTransfer != null) {
-			try {
-				synchronized(playerToTransfer) {
-					playerToTransfer.setIpAddress(newIpAddress);
-					playerToTransfer.setStatus(false);
-				}
-				try {
-					threadSafeRemovePlayer(playerToTransfer, uNameFirstChar);
-				} catch(PlayerRemoveException e) {
-					String err = String.format("Failed to delete player with username -- %s because account does not exist. Aborting TRANSFER!", uName);
-					threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
-					serverLog(err, oldIpAddress);
-					return err;
-				}
-				int ret = atomicallyExecuteTransfer(playerToTransfer, uNameFirstChar, newIpAddress);
-				if(ret > 0) {
-					String log = String.format("Successfully TRANSFERRED ACCOUNT for player with username %s to %s", uName, newIpAddress);
-					serverLog(log, uName);
-					return log;
-				} else {
-					throw new TransferAccountException();
-				}
-			} catch(TransferAccountException e) {
-				String err = String.format("Failed to add player account with username %s on remote server. ROLLING BACK!", uName);
-				threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
-				serverLog(err, oldIpAddress);
-				return err;
-			}
-		}
-		
-		String errExist = String.format("Player with username '%s' and that password combination does not exist", uName);
-		serverLog(errExist, oldIpAddress);
-		return errExist;
 	}
 
 	@Override
