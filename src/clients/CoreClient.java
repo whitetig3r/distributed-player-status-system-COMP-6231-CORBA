@@ -31,6 +31,8 @@ public class CoreClient {
 	}
 	
 	private static boolean isValidIP(String ipAddr) {
+		if(ipAddr == null) return false;
+		
 		String[] groups = ipAddr.split("\\.");
 
 		if (groups.length != 4) {
@@ -122,7 +124,8 @@ public class CoreClient {
 		 LocalDateTime tStamp = LocalDateTime.now(); 
 		 String writeString = String.format("[%s] %s @ (%s) -- %s", dtf.format(tStamp), uName, ipAddress, logStatement);
 		 String serverRegion = getRegionServer(ipAddress);
-		 String fName = serverRegion.equals("Unknown Server") ? "UNRESOLVED-Players" : serverRegion.substring(10);
+		 String fName = serverRegion == null || serverRegion.equals("Unknown Server") ? 
+				 "UNRESOLVED-Players" : serverRegion.substring(10);
 		 try{
 			File file = new File(String.format("player_logs/%s/%s.log", fName, uName));
 			file.getParentFile().mkdirs();
