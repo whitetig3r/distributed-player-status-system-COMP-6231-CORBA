@@ -83,9 +83,9 @@ public class GameServerServant extends GameServerPOA {
 			this.playerHash.putIfAbsent(uNameFirstChar, new CopyOnWriteArrayList<Player>());
 		}
 		
-		playerTransactionLock.lock(); // LOCK
-		
 		try {
+				playerTransactionLock.lock(); // LOCK
+				
 				Player playerToAdd = new Player(fName, lName, uName, password, ipAddress, age);
 				
 				Optional<Player> playerExists = this.playerHash.get(uNameFirstChar)
@@ -398,11 +398,11 @@ public class GameServerServant extends GameServerPOA {
 	    });
 
 	    CompletableFuture<String> extRetrieve1 = CompletableFuture.supplyAsync(()->{
-	    	return makeUDPRequestToExternalServer(EXT_UDP_PORTS.get(0));
+	    	return makeUDPStatusRequestToExternalServer(EXT_UDP_PORTS.get(0));
 	    });
 
 	    CompletableFuture<String> extRetrieve2 = CompletableFuture.supplyAsync(()->{
-	    	return makeUDPRequestToExternalServer(EXT_UDP_PORTS.get(1));
+	    	return makeUDPStatusRequestToExternalServer(EXT_UDP_PORTS.get(1));
 	    });
 
 	    CompletableFuture<Void> allRetrieve = CompletableFuture.allOf(intRetrieve, extRetrieve1, extRetrieve2); 
@@ -572,7 +572,7 @@ public class GameServerServant extends GameServerPOA {
 		return playerToReturn;
 	}
 
-	private String makeUDPRequestToExternalServer(int serverPort) {
+	private String makeUDPStatusRequestToExternalServer(int serverPort) {
 		DatagramSocket aSocket = null;
 		String reqOp = "getStatus";
 		try {
