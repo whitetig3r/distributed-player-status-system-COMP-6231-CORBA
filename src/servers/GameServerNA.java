@@ -7,8 +7,8 @@ import org.omg.CosNaming.NamingContextExtHelper;
 import org.omg.PortableServer.POA;
 import org.omg.PortableServer.POAHelper;
 
-import CoreGameServerIDL.GameServer;
-import CoreGameServerIDL.GameServerHelper;
+import corbaskeletons.GameServer;
+import corbaskeletons.GameServerHelper;
 
 public class GameServerNA {
 

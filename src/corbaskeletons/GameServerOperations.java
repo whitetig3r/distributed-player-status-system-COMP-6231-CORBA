@@ -1,4 +1,4 @@
-package CoreGameServerIDL;
+package corbaskeletons;
 
 
 /**

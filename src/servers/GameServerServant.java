@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 
 import org.omg.CORBA.ORB;
 
-import CoreGameServerIDL.GameServerPOA;
+import corbaskeletons.GameServerPOA;
 import exceptions.BadPasswordException;
 import exceptions.BadUserNameException;
 import exceptions.PlayerRemoveException;
@@ -230,6 +230,8 @@ public class GameServerServant extends GameServerPOA {
 						return err;
 					} catch(TransferAccountException e) {
 						String err = String.format("Failed to add player account with username %s on remote server. ROLLING BACK!", uName);
+						playerToTransfer.setIpAddress(oldIpAddress);
+						playerToTransfer.setStatus(true);
 						threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
 						serverLog(err, oldIpAddress);
 						return err;

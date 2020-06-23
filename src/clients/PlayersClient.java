@@ -10,8 +10,8 @@ import org.omg.CosNaming.NamingContextHelper;
 import org.omg.CosNaming.NamingContextPackage.CannotProceed;
 import org.omg.CosNaming.NamingContextPackage.NotFound;
 
-import CoreGameServerIDL.GameServer;
-import CoreGameServerIDL.GameServerHelper;
+import corbaskeletons.GameServer;
+import corbaskeletons.GameServerHelper;
 import exceptions.UnknownServerRegionException;
 
 public class PlayersClient extends CoreClient {

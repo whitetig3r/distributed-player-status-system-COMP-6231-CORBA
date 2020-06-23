@@ -1,4 +1,4 @@
-package CoreGameServerIDL;
+package corbaskeletons;
 
 
 /**
@@ -8,7 +8,7 @@ package CoreGameServerIDL;
 * Friday, June 19, 2020 9:25:27 PM EDT
 */
 
-public class _GameServerStub extends org.omg.CORBA.portable.ObjectImpl implements CoreGameServerIDL.GameServer
+public class _GameServerStub extends org.omg.CORBA.portable.ObjectImpl implements corbaskeletons.GameServer
 {
 
   public String createPlayerAccount (String fName, String lName, String uName, String password, String ipAddress, int age)

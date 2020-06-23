@@ -1,4 +1,4 @@
-package CoreGameServerIDL;
+package corbaskeletons;
 
 
 /**
@@ -9,7 +9,7 @@ package CoreGameServerIDL;
 */
 
 public abstract class GameServerPOA extends org.omg.PortableServer.Servant
- implements CoreGameServerIDL.GameServerOperations, org.omg.CORBA.portable.InvokeHandler
+ implements corbaskeletons.GameServerOperations, org.omg.CORBA.portable.InvokeHandler
 {
 
   // Constructors
