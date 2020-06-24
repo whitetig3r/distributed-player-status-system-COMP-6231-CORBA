@@ -1,6 +1,8 @@
 package models;
 
 import java.io.Serializable;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import exceptions.BadPasswordException;
 import exceptions.BadUserNameException;
@@ -11,6 +13,7 @@ public class Player implements Serializable {
 	private String fName, lName, uName, password, ipAddress;
 	private boolean status;
 	private int age;
+	private final WriteLock lock = new ReentrantReadWriteLock().writeLock();
 	
 	public Player(String fName, String lName, String uName, String password, String ipAddress, int age) throws BadUserNameException, BadPasswordException {
 		this.setfName(fName);
@@ -71,5 +74,17 @@ public class Player implements Serializable {
 	}
 	public void setStatus(boolean status) {
 		this.status = status;
+	}
+	
+	public void acquireLock() {
+		lock.lock();
+	}
+	
+	public void releaseLock() {
+		lock.unlock();
+	}
+	
+	public boolean hasLock() {
+		return lock.isHeldByCurrentThread();
 	}
 }
