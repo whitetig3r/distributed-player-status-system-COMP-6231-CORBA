@@ -1,4 +1,4 @@
-package corbaskeletons;
+package corbautils;
 
 
 /**
@@ -9,7 +9,7 @@ package corbaskeletons;
 */
 
 public abstract class GameServerPOA extends org.omg.PortableServer.Servant
- implements corbaskeletons.GameServerOperations, org.omg.CORBA.portable.InvokeHandler
+ implements corbautils.GameServerOperations, org.omg.CORBA.portable.InvokeHandler
 {
 
   // Constructors

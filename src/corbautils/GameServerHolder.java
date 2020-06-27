@@ -1,4 +1,4 @@
-package corbaskeletons;
+package corbautils;
 
 /**
 * CoreGameServerIDL/GameServerHolder.java .
@@ -9,30 +9,30 @@ package corbaskeletons;
 
 public final class GameServerHolder implements org.omg.CORBA.portable.Streamable
 {
-  public corbaskeletons.GameServer value = null;
+  public corbautils.GameServer value = null;
 
   public GameServerHolder ()
   {
   }
 
-  public GameServerHolder (corbaskeletons.GameServer initialValue)
+  public GameServerHolder (corbautils.GameServer initialValue)
   {
     value = initialValue;
   }
 
   public void _read (org.omg.CORBA.portable.InputStream i)
   {
-    value = corbaskeletons.GameServerHelper.read (i);
+    value = corbautils.GameServerHelper.read (i);
   }
 
   public void _write (org.omg.CORBA.portable.OutputStream o)
   {
-    corbaskeletons.GameServerHelper.write (o, value);
+    corbautils.GameServerHelper.write (o, value);
   }
 
   public org.omg.CORBA.TypeCode _type ()
   {
-    return corbaskeletons.GameServerHelper.type ();
+    return corbautils.GameServerHelper.type ();
   }
 
 }

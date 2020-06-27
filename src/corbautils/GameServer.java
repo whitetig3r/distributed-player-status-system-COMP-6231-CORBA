@@ -1,4 +1,4 @@
-package corbaskeletons;
+package corbautils;
 
 
 /**

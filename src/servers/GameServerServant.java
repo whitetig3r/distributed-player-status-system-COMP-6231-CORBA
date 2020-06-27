@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 
 import org.omg.CORBA.ORB;
 
-import corbaskeletons.GameServerPOA;
+import corbautils.GameServerPOA;
 import exceptions.BadPasswordException;
 import exceptions.BadUserNameException;
 import exceptions.PlayerRemoveException;
@@ -208,13 +208,18 @@ public class GameServerServant extends GameServerPOA {
 					return player.getuName().equals(uName) && player.getPassword().equals(password);
 				}).findAny().orElse(null);
 				
+				boolean wasOnline = false;
 				
 				if(playerToTransfer != null) {
 					try {
 						playerToTransfer.acquireLock(); // LOCK
 						
 						playerToTransfer.setIpAddress(newIpAddress);
-						playerToTransfer.setStatus(false);
+						
+						if(playerToTransfer.getStatus()) {
+							playerToTransfer.setStatus(false);
+							wasOnline = true;
+						}
 						
 						threadSafeRemovePlayer(playerToTransfer, uNameFirstChar);
 						
@@ -235,7 +240,7 @@ public class GameServerServant extends GameServerPOA {
 					} catch(TransferAccountException e) {
 						String err = String.format("Failed to add player account with username %s on remote server. ROLLING BACK!", uName);
 						playerToTransfer.setIpAddress(oldIpAddress);
-						playerToTransfer.setStatus(true);
+						if(wasOnline) playerToTransfer.setStatus(true);
 						threadSafeAddPlayerBack(playerToTransfer, uNameFirstChar);
 						serverLog(err, oldIpAddress);
 						return err;
@@ -480,28 +485,16 @@ public class GameServerServant extends GameServerPOA {
 	}
 	
 	private void threadSafeRemovePlayer(Player playerToSuspend, Character firstCharOfPlayer) throws PlayerRemoveException {
-		try { 
-			playerToSuspend.acquireLock(); // LOCK
-			if(this.playerHash.get(firstCharOfPlayer).contains(playerToSuspend)) {
-				this.playerHash.get(firstCharOfPlayer).remove(playerToSuspend);
-			} else {
-				throw new PlayerRemoveException();
-			}
-		} finally {
-			if(playerToSuspend != null && playerToSuspend.hasLock())
-				playerToSuspend.releaseLock(); // UNLOCK
-		}	
+		if(this.playerHash.get(firstCharOfPlayer).contains(playerToSuspend)) {
+			this.playerHash.get(firstCharOfPlayer).remove(playerToSuspend);
+		} else {
+			throw new PlayerRemoveException();
+		}
 	}
 	
 	private void threadSafeAddPlayerBack(Player playerToTransfer, Character uNameFirstChar) {
 		// not calling createPlayer to avoid logging
-		try {
-			playerToTransfer.acquireLock(); // LOCK
-			this.playerHash.get(uNameFirstChar).addIfAbsent(playerToTransfer);
-		} finally {
-			if(playerToTransfer != null && playerToTransfer.hasLock())
-				playerToTransfer.releaseLock(); // UNLOCK
-		}
+		this.playerHash.get(uNameFirstChar).addIfAbsent(playerToTransfer);
 	}
 	
 	// NETWORK UTILS 
